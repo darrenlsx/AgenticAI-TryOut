@@ -45,4 +45,30 @@ db.exec(`
   );
 `);
 
+// Who has joined each order (via its join code). Only members can see an order.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS order_members (
+    order_id  INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id),
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (order_id, user_id)
+  );
+`);
+
+// Migrate databases created before join codes existed.
+const hasJoinCode = db.prepare("SELECT 1 FROM pragma_table_info('orders') WHERE name = 'join_code'").get();
+if (!hasJoinCode) {
+  db.exec('ALTER TABLE orders ADD COLUMN join_code TEXT');
+  const { newJoinCode } = require('./codes');
+  const setCode = db.prepare('UPDATE orders SET join_code = ? WHERE id = ?');
+  for (const { id } of db.prepare('SELECT id FROM orders').all()) setCode.run(newJoinCode(), id);
+  // Everyone already involved in an order becomes a member of it.
+  db.exec(`
+    INSERT OR IGNORE INTO order_members (order_id, user_id)
+      SELECT id, organiser_id FROM orders
+      UNION SELECT order_id, user_id FROM items;
+  `);
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS orders_join_code ON orders(join_code)');
+
 module.exports = db;

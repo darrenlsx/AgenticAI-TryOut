@@ -4,10 +4,10 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const path = require('path');
 const db = require('./db');
+const { newJoinCode } = require('./codes');
 
 const PORT = process.env.PORT || 3000;
-const INVITE_CODE = process.env.INVITE_CODE || 'makan2026';
-const MAX_MEMBERS = 10;
+const MAX_MEMBERS = 10; // per group order
 
 const app = express();
 app.use(express.json());
@@ -36,6 +36,16 @@ function getOrder(id) {
     FROM orders o JOIN users u ON u.id = o.organiser_id WHERE o.id = ?`).get(id);
 }
 
+const isMember = (orderId, userId) =>
+  !!db.prepare('SELECT 1 FROM order_members WHERE order_id = ? AND user_id = ?').get(orderId, userId);
+
+// Load an order the current user belongs to. Non-members get a 404 so orders stay private.
+function getMemberOrder(req, res) {
+  const order = getOrder(req.params.id);
+  if (!order || !isMember(order.id, req.user.id)) { bad(res, 404, 'Order not found.'); return null; }
+  return order;
+}
+
 function parsePrice(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0 || n > 1000) return null;
@@ -51,11 +61,8 @@ app.post('/api/signup', (req, res) => {
   const username = cleanText(req.body.username, 30);
   const displayName = cleanText(req.body.display_name, 40) || username;
   const password = typeof req.body.password === 'string' ? req.body.password : '';
-  if (req.body.invite_code !== INVITE_CODE) return bad(res, 403, 'Wrong invite code. Ask your group for it.');
   if (!/^[a-zA-Z0-9_]{3,30}$/.test(username)) return bad(res, 400, 'Username: 3-30 letters, numbers or _.');
   if (password.length < 6) return bad(res, 400, 'Password must be at least 6 characters.');
-  const { n } = db.prepare('SELECT COUNT(*) AS n FROM users').get();
-  if (n >= MAX_MEMBERS) return bad(res, 403, `This group is full (${MAX_MEMBERS} members max).`);
   if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) return bad(res, 409, 'Username taken.');
 
   const hash = bcrypt.hashSync(password, 10);
@@ -91,18 +98,18 @@ app.get('/api/orders', requireLogin, (req, res) => {
     FROM orders o
     JOIN users u ON u.id = o.organiser_id
     LEFT JOIN items i ON i.order_id = o.id
-    -- All open orders, plus the 50 most recent placed ones.
-    WHERE o.status = 'open'
-       OR o.id IN (SELECT id FROM orders WHERE status = 'placed' ORDER BY id DESC LIMIT 50)
-    GROUP BY o.id ORDER BY o.id DESC`).all();
-  // Who is in each returned order: the organiser plus anyone who added items (for the avatar row).
+    -- Orders I belong to: all open ones, plus my 50 most recent placed ones.
+    WHERE o.id IN (SELECT order_id FROM order_members WHERE user_id = ?)
+      AND (o.status = 'open' OR o.id IN (
+        SELECT o2.id FROM orders o2 JOIN order_members m ON m.order_id = o2.id AND m.user_id = ?
+        WHERE o2.status = 'placed' ORDER BY o2.id DESC LIMIT 50))
+    GROUP BY o.id ORDER BY o.id DESC`).all(req.user.id, req.user.id);
+  // Who has joined each returned order (for the avatar row).
   const ids = JSON.stringify(orders.map(o => o.id));
   const participants = db.prepare(`
     WITH ids AS (SELECT value AS id FROM json_each(?))
     SELECT p.order_id, p.user_id, u.display_name FROM (
-      SELECT id AS order_id, organiser_id AS user_id FROM orders WHERE id IN (SELECT id FROM ids)
-      UNION
-      SELECT order_id, user_id FROM items WHERE order_id IN (SELECT id FROM ids)
+      SELECT order_id, user_id FROM order_members WHERE order_id IN (SELECT id FROM ids)
     ) p JOIN users u ON u.id = p.user_id ORDER BY u.display_name`).all(ids);
   const byOrder = new Map(orders.map(o => [o.id, (o.participants = [])]));
   for (const p of participants) byOrder.get(p.order_id).push({ id: p.user_id, name: p.display_name });
@@ -112,14 +119,35 @@ app.get('/api/orders', requireLogin, (req, res) => {
 app.post('/api/orders', requireLogin, (req, res) => {
   const restaurant = cleanText(req.body.restaurant, 80);
   if (!restaurant) return bad(res, 400, 'Where are we eating? Enter a restaurant name.');
-  const { lastInsertRowid } = db.prepare(
-    'INSERT INTO orders (restaurant, organiser_id) VALUES (?, ?)').run(restaurant, req.user.id);
-  res.status(201).json(getOrder(lastInsertRowid));
+  let orderId;
+  for (let attempt = 0; !orderId; attempt++) {
+    try {
+      orderId = Number(db.prepare('INSERT INTO orders (restaurant, organiser_id, join_code) VALUES (?, ?, ?)')
+        .run(restaurant, req.user.id, newJoinCode()).lastInsertRowid);
+    } catch (err) {
+      if (attempt >= 5 || !/UNIQUE/.test(err.message)) throw err; // retry on a code collision
+    }
+  }
+  db.prepare('INSERT INTO order_members (order_id, user_id) VALUES (?, ?)').run(orderId, req.user.id);
+  res.status(201).json(getOrder(orderId));
+});
+
+// Join a group order with the code the organiser shared.
+app.post('/api/orders/join', requireLogin, (req, res) => {
+  const code = cleanText(req.body.code, 20).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const order = code && db.prepare('SELECT id, status FROM orders WHERE join_code = ?').get(code);
+  if (!order) return bad(res, 404, 'No order with that code. Check it with your organiser.');
+  if (isMember(order.id, req.user.id)) return res.json(getOrder(order.id));
+  if (order.status !== 'open') return bad(res, 409, 'That order has already been placed.');
+  const { n } = db.prepare('SELECT COUNT(*) AS n FROM order_members WHERE order_id = ?').get(order.id);
+  if (n >= MAX_MEMBERS) return bad(res, 403, `This order is full (${MAX_MEMBERS} people max).`);
+  db.prepare('INSERT INTO order_members (order_id, user_id) VALUES (?, ?)').run(order.id, req.user.id);
+  res.status(201).json(getOrder(order.id));
 });
 
 app.get('/api/orders/:id', requireLogin, (req, res) => {
-  const order = getOrder(req.params.id);
-  if (!order) return bad(res, 404, 'Order not found.');
+  const order = getMemberOrder(req, res);
+  if (!order) return;
   const items = db.prepare(`
     SELECT i.*, u.display_name AS user_name FROM items i
     JOIN users u ON u.id = i.user_id WHERE i.order_id = ? ORDER BY i.id`).all(order.id);
@@ -138,8 +166,8 @@ app.get('/api/orders/:id', requireLogin, (req, res) => {
 
 // Organiser-only: lock the order once it has been placed with the restaurant.
 app.post('/api/orders/:id/place', requireLogin, (req, res) => {
-  const order = getOrder(req.params.id);
-  if (!order) return bad(res, 404, 'Order not found.');
+  const order = getMemberOrder(req, res);
+  if (!order) return;
   if (order.organiser_id !== req.user.id) return bad(res, 403, 'Only the organiser can place this order.');
   if (order.status === 'placed') return bad(res, 409, 'Order already placed.');
   db.prepare("UPDATE orders SET status = 'placed', placed_at = datetime('now') WHERE id = ?").run(order.id);
@@ -148,8 +176,8 @@ app.post('/api/orders/:id/place', requireLogin, (req, res) => {
 
 // Organiser-only: delete an order that is still open.
 app.delete('/api/orders/:id', requireLogin, (req, res) => {
-  const order = getOrder(req.params.id);
-  if (!order) return bad(res, 404, 'Order not found.');
+  const order = getMemberOrder(req, res);
+  if (!order) return;
   if (order.organiser_id !== req.user.id) return bad(res, 403, 'Only the organiser can cancel this order.');
   if (order.status === 'placed') return bad(res, 409, 'A placed order cannot be cancelled.');
   db.prepare('DELETE FROM orders WHERE id = ?').run(order.id);
@@ -158,8 +186,8 @@ app.delete('/api/orders/:id', requireLogin, (req, res) => {
 
 // Organiser-only: toggle whether a member has paid them back.
 app.post('/api/orders/:id/payments/:userId', requireLogin, (req, res) => {
-  const order = getOrder(req.params.id);
-  if (!order) return bad(res, 404, 'Order not found.');
+  const order = getMemberOrder(req, res);
+  if (!order) return;
   if (order.organiser_id !== req.user.id) return bad(res, 403, 'Only the organiser can mark payments.');
   if (order.status !== 'placed') return bad(res, 409, 'Place the order before tracking payments.');
   const userId = Number(req.params.userId);
@@ -184,8 +212,8 @@ function loadEditableItem(req, res) {
 }
 
 app.post('/api/orders/:id/items', requireLogin, (req, res) => {
-  const order = getOrder(req.params.id);
-  if (!order) return bad(res, 404, 'Order not found.');
+  const order = getMemberOrder(req, res);
+  if (!order) return;
   if (order.status !== 'open') return bad(res, 409, 'This order is locked — it has been placed.');
   const dish = cleanText(req.body.dish, 80);
   const price = parsePrice(req.body.price);
@@ -220,5 +248,4 @@ app.use('/api', (req, res) => bad(res, 404, 'Not found.'));
 
 app.listen(PORT, () => {
   console.log(`Makan Kaki running at http://localhost:${PORT}`);
-  console.log(`Invite code: ${INVITE_CODE}`);
 });

@@ -90,7 +90,6 @@ function renderAuth(mode = 'login') {
         <input name="username" placeholder="Username" autocomplete="username" required>
         ${mode === 'signup' ? '<input name="display_name" placeholder="Display name (e.g. Ah Boon)">' : ''}
         <input name="password" type="password" placeholder="Password" autocomplete="${mode === 'login' ? 'current-password' : 'new-password'}" required>
-        ${mode === 'signup' ? '<input name="invite_code" placeholder="Group invite code" required>' : ''}
         <button>${mode === 'login' ? 'Log in' : 'Create account'}</button>
       </form>
     </div>`;
@@ -129,15 +128,25 @@ async function renderOrders() {
         <input name="restaurant" class="grow" placeholder="Where are we eating? e.g. Ah Seng Chicken Rice" required>
         <button>Start order</button>
       </form>
-      <p class="muted">You'll be the organiser — you place the order and collect the money.</p>
+      <p class="muted">You'll be the organiser — share the join code, place the order and collect the money.</p>
+      <h2 class="join-heading">Join a group order</h2>
+      <form id="joinOrder" class="row">
+        <input name="code" class="grow code-input" placeholder="Join code, e.g. K7P2QX" maxlength="12" autocomplete="off" required>
+        <button class="ghost">Join</button>
+      </form>
     </div>
-    ${orderSection('🔥 Happening now', orders.filter(o => o.status === 'open'), 'No open orders. Hungry? Start one above.')}
+    ${orderSection('🔥 Happening now', orders.filter(o => o.status === 'open'), 'No open orders. Start one, or join with a code from a colleague.')}
     ${orderSection('Past orders', orders.filter(o => o.status === 'placed'), 'Placed orders will show up here.')}`;
-  document.getElementById('newOrder').onsubmit = async e => {
+  const go = (url, toastMsg) => async e => {
     e.preventDefault();
-    try { const o = await api('POST', '/api/orders', formData(e.target)); location.hash = `#/orders/${o.id}`; }
-    catch (err) { toast(err.message); }
+    try {
+      const o = await api('POST', url, formData(e.target));
+      if (toastMsg) toast(toastMsg(o));
+      location.hash = `#/orders/${o.id}`;
+    } catch (err) { toast(err.message); }
   };
+  document.getElementById('newOrder').onsubmit = go('/api/orders');
+  document.getElementById('joinOrder').onsubmit = go('/api/orders/join', o => `Joined ${o.restaurant} 🎉`);
 }
 
 async function renderOrder(id, editingId = null) {
@@ -193,6 +202,13 @@ async function renderOrder(id, editingId = null) {
         <span class="badge ${order.status}">${isOpen ? 'Open' : 'Placed 🔒'}</span>
       </div>
       <p class="muted">Organised by ${esc(order.organiser_name)}${isOrganiser ? ' (you)' : ''} · started ${when(order.created_at)}${order.placed_at ? ` · placed ${when(order.placed_at)}` : ''}</p>
+      ${isOpen ? `
+        <div class="join-code">
+          <span class="muted">Join code</span>
+          <code id="joinCode">${esc(order.join_code)}</code>
+          <button class="ghost small" id="copyCode">Copy</button>
+          <span class="muted">Share this so colleagues can add their dishes.</span>
+        </div>` : ''}
       ${!isOpen ? `<div class="banner">🔒 This order has been placed and is locked.</div>` : ''}
       ${shareLine()}
       ${isOpen ? `
@@ -228,6 +244,11 @@ async function renderOrder(id, editingId = null) {
       </div>` : ''}`;
 
   const refresh = (edit = null) => renderOrder(id, edit);
+
+  document.getElementById('copyCode')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(order.join_code); toast('Join code copied'); }
+    catch { getSelection().selectAllChildren(document.getElementById('joinCode')); toast('Press Ctrl+C to copy'); }
+  });
   const run = fn => async (...a) => { try { await fn(...a); } catch (err) { toast(err.message); } };
 
   document.getElementById('addItem')?.addEventListener('submit', run(async e => {
