@@ -6,7 +6,27 @@ let me = null;
 // ---------- helpers ----------
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = cents => '$' + (cents / 100).toFixed(2);
-const when = iso => new Date(iso.replace(' ', 'T') + 'Z').toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+// Friendly dates: "Today, 3:09 PM", "Yesterday, 12:30 PM", "Mon, 3:09 PM" (this week), else "Nov 12, 3:09 PM".
+function when(iso) {
+  const d = new Date(iso.replace(' ', 'T') + 'Z');
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const startOf = x => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const days = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  if (days > 1 && days < 7) return `${d.toLocaleDateString([], { weekday: 'short' })}, ${time}`;
+  return `${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+// Coloured initial circles; colour is stable per user id.
+const AVATAR_COLOURS = ['#e2572b', '#2f8f5b', '#3b6fd4', '#b7791f', '#8e44ad', '#16a085', '#c0392b', '#d35400', '#2c3e50', '#7f8c8d'];
+const initials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const avatar = p => `<span class="avatar" style="background:${AVATAR_COLOURS[p.id % AVATAR_COLOURS.length]}" title="${esc(p.name)}">${esc(initials(p.name))}</span>`;
+function avatarStack(people, max = 5) {
+  if (!people.length) return '';
+  const extra = people.length - max;
+  return `<span class="avatars">${people.slice(0, max).map(avatar).join('')}${extra > 0 ? `<span class="avatar more">+${extra}</span>` : ''}</span>`;
+}
 
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -84,6 +104,22 @@ function renderAuth(mode = 'login') {
   };
 }
 
+function orderSection(title, orders, emptyText) {
+  return `
+    <div class="card">
+      <h2>${title} <span class="count">${orders.length}</span></h2>
+      ${orders.length ? `<div class="order-list">${orders.map(o => `
+        <a class="order-row ${o.status}" href="#/orders/${o.id}">
+          <div class="order-info">
+            <div class="order-title">${esc(o.restaurant)}</div>
+            <div class="muted">by ${esc(o.organiser_name)} · ${when(o.created_at)} · ${o.item_count} item${o.item_count === 1 ? '' : 's'}</div>
+            ${o.participants.length ? `<div class="order-people">${avatarStack(o.participants)}</div>` : ''}
+          </div>
+          <div class="row"><span class="amount">${money(o.total_cents)}</span><span class="badge ${o.status}">${o.status === 'open' ? 'Open' : 'Placed 🔒'}</span><span class="chevron" aria-hidden="true">›</span></div>
+        </a>`).join('')}</div>` : `<p class="muted">${emptyText}</p>`}
+    </div>`;
+}
+
 async function renderOrders() {
   const orders = await api('GET', '/api/orders');
   app.innerHTML = `
@@ -95,17 +131,8 @@ async function renderOrders() {
       </form>
       <p class="muted">You'll be the organiser — you place the order and collect the money.</p>
     </div>
-    <div class="card">
-      <h2>Orders</h2>
-      ${orders.length ? `<ul class="list">${orders.map(o => `
-        <li>
-          <div>
-            <a href="#/orders/${o.id}">${esc(o.restaurant)}</a>
-            <div class="muted">by ${esc(o.organiser_name)} · ${when(o.created_at)} · ${o.item_count} item${o.item_count === 1 ? '' : 's'}</div>
-          </div>
-          <div class="row"><span class="amount">${money(o.total_cents)}</span><span class="badge ${o.status}">${o.status === 'open' ? 'Open' : 'Placed 🔒'}</span></div>
-        </li>`).join('')}</ul>` : '<p class="muted">No orders yet. Hungry? Start one above.</p>'}
-    </div>`;
+    ${orderSection('🔥 Happening now', orders.filter(o => o.status === 'open'), 'No open orders. Hungry? Start one above.')}
+    ${orderSection('Past orders', orders.filter(o => o.status === 'placed'), 'Placed orders will show up here.')}`;
   document.getElementById('newOrder').onsubmit = async e => {
     e.preventDefault();
     try { const o = await api('POST', '/api/orders', formData(e.target)); location.hash = `#/orders/${o.id}`; }
@@ -120,6 +147,23 @@ async function renderOrder(id, editingId = null) {
   const { order, items, summary } = data;
   const isOrganiser = order.organiser_id === me.id;
   const isOpen = order.status === 'open';
+
+  // A personal "what do I owe / collect" line at the top of the order.
+  function shareLine() {
+    if (isOrganiser) {
+      const others = summary.people.filter(p => p.user_id !== me.id);
+      if (!others.length) return '';
+      const owed = others.reduce((s, p) => s + p.total_cents, 0);
+      const outstanding = others.filter(p => !p.paid).reduce((s, p) => s + p.total_cents, 0);
+      const detail = isOpen ? `from ${others.length} ${others.length === 1 ? 'person' : 'people'}`
+        : outstanding ? `${money(outstanding)} still unpaid` : 'everyone has paid 🎉';
+      return `<div class="share collect">You're collecting <strong>${money(owed)}</strong> <span class="muted">· ${detail}</span></div>`;
+    }
+    const mine = summary.people.find(p => p.user_id === me.id);
+    if (!mine) return isOpen ? `<div class="share">You haven't added anything yet.</div>` : '';
+    if (mine.paid) return `<div class="share paid">You paid ${esc(order.organiser_name)} <strong>${money(mine.total_cents)}</strong> ✓</div>`;
+    return `<div class="share owe">You owe ${esc(order.organiser_name)} <strong>${money(mine.total_cents)}</strong>${isOpen ? ' <span class="muted">· so far</span>' : ''}</div>`;
+  }
 
   const itemRow = i => {
     const mine = i.user_id === me.id;
@@ -149,7 +193,8 @@ async function renderOrder(id, editingId = null) {
         <span class="badge ${order.status}">${isOpen ? 'Open' : 'Placed 🔒'}</span>
       </div>
       <p class="muted">Organised by ${esc(order.organiser_name)}${isOrganiser ? ' (you)' : ''} · started ${when(order.created_at)}${order.placed_at ? ` · placed ${when(order.placed_at)}` : ''}</p>
-      ${!isOpen ? `<div class="banner">🔒 This order has been placed and is locked. Pay ${esc(order.organiser_name)} back!</div>` : ''}
+      ${!isOpen ? `<div class="banner">🔒 This order has been placed and is locked.</div>` : ''}
+      ${shareLine()}
       ${isOpen ? `
         <form id="addItem" class="row">
           <input name="dish" class="grow" placeholder="Your dish" required>
@@ -166,7 +211,7 @@ async function renderOrder(id, editingId = null) {
       <h2>Who owes what</h2>
       ${summary.people.length ? `<ul class="list">${summary.people.map(p => `
         <li>
-          <span>${esc(p.name)}${p.user_id === order.organiser_id ? ' <span class="muted">(organiser)</span>' : ''}</span>
+          <span class="row">${avatar({ id: p.user_id, name: p.name })}${esc(p.name)}${p.user_id === order.organiser_id ? ' <span class="muted">(organiser)</span>' : ''}</span>
           <div class="row">
             <span class="amount">${money(p.total_cents)}</span>
             ${!isOpen && p.user_id !== order.organiser_id ? (isOrganiser

@@ -92,6 +92,13 @@ app.get('/api/orders', requireLogin, (req, res) => {
     JOIN users u ON u.id = o.organiser_id
     LEFT JOIN items i ON i.order_id = o.id
     GROUP BY o.id ORDER BY o.id DESC LIMIT 50`).all();
+  // Who has added items to each order (for the avatar row).
+  const participants = db.prepare(`
+    SELECT DISTINCT i.order_id, u.id, u.display_name FROM items i
+    JOIN users u ON u.id = i.user_id ORDER BY u.display_name`).all();
+  for (const o of orders) {
+    o.participants = participants.filter(p => p.order_id === o.id).map(p => ({ id: p.id, name: p.display_name }));
+  }
   res.json(orders);
 });
 
