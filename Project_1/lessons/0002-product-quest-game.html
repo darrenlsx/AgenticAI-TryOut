@@ -8,44 +8,56 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 "Courier New",ui-monospace,monospace}
 main{max-width:760px;margin:0 auto;padding:16px}
 h1{font-size:1.6rem;margin:.2em 0;color:var(--cyan);letter-spacing:.08em;text-shadow:0 0 12px var(--cyan)}
+h3{margin:.2em 0 .5em;color:var(--gold)}
 .sub{color:var(--mute);margin:0 0 12px}
+a{color:var(--cyan)}
 #stage{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;background:#05051a}
 canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
 .bars{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;padding:8px 10px;gap:10px;pointer-events:none}
-.bar{flex:1;max-width:46%;font-size:12px;color:#fff;text-shadow:0 1px 2px #000}
-.hp{height:10px;background:#222;border:1px solid #fff5;border-radius:3px;overflow:hidden;margin-top:3px}
+.side{flex:1;max-width:46%;font-size:12px;color:#fff;text-shadow:0 1px 2px #000}
+.side.enemy{text-align:right}
+.unit{margin-bottom:4px}.unit.act b::before{content:"▶ ";color:var(--gold)}.unit.ko{opacity:.4}
+.hp{height:8px;background:#222;border:1px solid #fff5;border-radius:3px;overflow:hidden;margin-top:2px}
 .hp i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#b6ff5d);transition:width .4s}
-.bar.enemy .hp i{background:linear-gradient(90deg,var(--pink),#ff9a5f)}
+.enemy .hp{height:10px}.enemy .hp i{background:linear-gradient(90deg,var(--pink),#ff9a5f)}
 .weak{font-size:11px;color:var(--gold)}
 #panel{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;min-height:180px}
-#log{color:var(--mute);min-height:2.6em;margin-bottom:10px}
-#log b{color:var(--fg)}
+#log{color:var(--mute);min-height:2.6em;margin-bottom:10px}#log b{color:var(--fg)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:520px){.grid{grid-template-columns:1fr}}
 button{font:inherit;color:var(--fg);background:transparent;border:2px solid var(--line);border-radius:8px;padding:10px;text-align:left;cursor:pointer}
-button:hover,button:focus-visible{border-color:var(--cyan);outline:none;box-shadow:0 0 10px var(--cyan)}
+button:hover:not(:disabled),button:focus-visible{border-color:var(--cyan);outline:none;box-shadow:0 0 10px var(--cyan)}
 button small{display:block;color:var(--mute);font-size:12px}
 button.ok{border-color:var(--ok);color:var(--ok)}button.no{border-color:var(--bad);color:var(--bad)}
+button.sel{border-color:var(--gold);box-shadow:0 0 10px var(--gold);background:#ffd25e14}
+button:disabled{opacity:.5;cursor:default}
+.dossier{border-left:3px solid var(--pink);padding:4px 10px;margin:0 0 12px;color:var(--fg)}
+.dossier p{margin:.3em 0}
 .q{font-weight:bold;margin-bottom:8px}
 .big{text-align:center;padding:10px}
 .big button{text-align:center;display:inline-block;margin-top:10px;border-color:var(--cyan)}
+.row{display:flex;justify-content:flex-end;margin-top:10px}
 .foot{color:var(--mute);font-size:12px;margin-top:14px}
-.foot a{color:var(--cyan)}
 </style></head><body><main>
 <h1>★ PRODUCT QUEST ★</h1>
-<p class="sub">A turn-based battle based on IDG's <a style="color:var(--cyan)" href="https://www.idg.gov.sg/product-thinking/">Product Thinking</a> pathway. Pick the skill that hits the enemy's weakness, then answer correctly to land it.</p>
+<p class="sub">A team battle game based on IDG's <a href="https://www.idg.gov.sg/product-thinking/">Product Thinking</a> pathway. Read each enemy's profile, work out its weakness, deploy the right 2 heroes, then answer correctly to land their attacks.</p>
 <div id="stage"><canvas id="c" width="320" height="160"></canvas>
-<div class="bars"><div class="bar"><b>YOU · Pathfinder</b><div class="hp"><i id="php"></i></div><span id="ptxt"></span></div>
-<div class="bar enemy" style="text-align:right"><b id="ename"></b><div class="hp"><i id="ehp"></i></div><span id="etxt"></span> <span class="weak" id="eweak"></span></div></div></div>
+<div class="bars"><div class="side" id="team"></div>
+<div class="side enemy"><b id="ename"></b><div class="hp"><i id="ehp"></i></div><span id="etxt"></span> <span class="weak" id="eweak"></span></div></div></div>
 <div id="panel"></div>
 <p class="foot">Lesson 1 recap: <a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking1/">IDG Module 1</a> · <a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking2/">Module 2 (Five Whys)</a>. Stuck on a concept? Ask your teacher (Claude) a follow-up question.</p>
 </main>
 <script>
-const SK={
+const TY={
  lens:{n:"Problem Lens",d:"Problems before solutions",c:"#4ef0ff"},
  whys:{n:"Five Whys",d:"Symptom → root cause",c:"#ffd25e"},
- outcome:{n:"Outcome Strike",d:"Outcomes over outputs",c:"#ff5fae"},
- unite:{n:"Triad Link",d:"Policy + Ops + Tech",c:"#5dffa0"}};
+ outcome:{n:"Outcome",d:"Outcomes over outputs",c:"#ff5fae"},
+ unite:{n:"Triad",d:"Policy + Ops + Tech together",c:"#5dffa0"}};
+const HEROES=[
+ {id:"lumen",n:"Lumen",ty:"lens",hair:"#4ef0ff",suit:"#2a5bd6",bio:"A scout who refuses to build anything until the problem has been named."},
+ {id:"quill",n:"Quill",ty:"whys",hair:"#ffd25e",suit:"#7a4a12",bio:"A detective who asks \"why?\" until the symptoms give way to the cause."},
+ {id:"nova",n:"Nova",ty:"outcome",hair:"#ff5fae",suit:"#6a1f6a",bio:"A navigator who only counts the change achieved, never the features shipped."},
+ {id:"trine",n:"Trine",ty:"unite",hair:"#5dffa0",suit:"#1f5a3a",bio:"A diplomat who gets policy, ops and tech people around one table."}];
 const QS={
  lens:[["Your boss says \"We need an AI chatbot.\" First move?","Ask what problem it solves","Pick the best chatbot vendor","Start building a quick demo",0],
   ["Which is a problem, not a solution?","Officers miss urgent emails","Deploy GenAI across agency","Build a new mobile app",0],
@@ -57,86 +69,108 @@ const QS={
   ["\"Launched app with 12 features\" misses which idea?","Outcomes over outputs","Policy-Ops-Tech links","Problems before fixes",0],
   ["Success should be defined by…","Features that were shipped","The change that was achieved","Lines of code that were written",1]],
  unite:[["Who should frame the problem together?","Only the tech team alone","Policy, ops and tech people","An outside vendor only",1],
-  ["Why integrate Policy, Ops and Tech?","Tech alone misses real constraints","It makes meetings much longer","Vendors require it by contract",0]]};
+  ["Why integrate Policy, Ops and Tech?","Tech alone misses real constraints","It makes meetings much longer","Vendors require it by contract",0],
+  ["Ops staff know the workflow, tech can build. What's missing?","The rules and policy owners","A bigger cloud server budget","More dashboards for leaders",0]]};
 const FOES=[
- {n:"SOLUTIONITIS",hp:80,atk:14,weak:["lens"],taunt:"\"Just build the chatbot already!\"",col:"#ff5fae",shape:"slime"},
- {n:"THE FEATURE FACTORY",hp:140,atk:18,weak:["whys","outcome"],boss:1,taunt:"\"Ship more features! Count the outputs!\"",col:"#ff9a5f",shape:"boss"}];
-let P,F,fi,used,phase,busy,flash=0,shake=0,t=0,stars=[];
+ {n:"SOLUTIONITIS",hp:90,atk:16,weak:["lens"],col:"#ff5fae",shape:"slime",
+  profile:["Arrives already holding a solution: \"Just build the chatbot!\"","Nobody in its camp can say what problem the chatbot solves."],
+  debrief:"Solutionitis jumps to a solution before naming a problem. <b>Problem Lens</b> (problems before solutions) breaks it."},
+ {n:"THE FEATURE FACTORY",hp:160,atk:19,weak:["whys","outcome"],boss:1,col:"#ff9a5f",shape:"boss",
+  profile:["<b>Phase 1:</b> patches every complaint with a new feature, but the complaints keep regrowing because it only treats symptoms.","<b>Phase 2:</b> celebrates \"40 features shipped!\" and never checks whether anything changed for users."],
+  debrief:"Phase 1 treated symptoms: <b>Five Whys</b> digs to the root cause. Phase 2 counted outputs: <b>Outcome</b> (outcomes over outputs) breaks it."}];
+let team,F,fi,used={},phase,turn,flash=0,shake=0,t=0,stars=[],fx=[],lunge={},lungeE=0,hurt={};
 for(let i=0;i<60;i++)stars.push([Math.random()*320,Math.random()*160,Math.random()]);
-const $=id=>document.getElementById(id),panel=$("panel");
+const $=id=>document.getElementById(id),panel=$("panel"),wait=ms=>new Promise(r=>setTimeout(r,ms));
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-function start(){P={hp:100,max:100};fi=0;used={};nextFoe()}
-function nextFoe(){F={...FOES[fi],max:FOES[fi].hp,known:false};phase=0;hud();
- say(`<b>${F.n}</b> appears! ${F.taunt}`);setTimeout(menu,900)}
-function curWeak(){return F.boss?F.weak[phase]:F.weak[0]}
-function hud(){$("php").style.width=P.hp/P.max*100+"%";$("ptxt").textContent=P.hp+"/"+P.max;
+const H=id=>HEROES.find(h=>h.id===id);
+function start(){fi=0;F=null;team=[];draft()}
+// ---- team draft ----
+function draft(){const foe=FOES[fi];F=null;team=[];hud();let sel=[];
+ panel.innerHTML=`<h3>Battle ${fi+1} of ${FOES.length}: ${foe.n}</h3><div class="dossier">${foe.profile.map(p=>`<p>${p}</p>`).join("")}</div>
+ <div id="log">Which weakness does this behaviour reveal? <b>Deploy 2 heroes.</b> Each hero's attacks hit hard only if their type matches the weakness.</div><div class="grid" id="hg"></div><div class="row"><button id="go" disabled>Deploy team ▶</button></div>`;
+ HEROES.forEach(h=>{const b=document.createElement("button");b.innerHTML=`<span style="color:${h.hair}">◆ ${h.n}</span> <small>Type: ${TY[h.ty].n} — ${TY[h.ty].d}</small><small>${h.bio}</small>`;
+  b.onclick=()=>{if(sel.includes(h.id))sel=sel.filter(x=>x!==h.id);else if(sel.length<2)sel.push(h.id);
+   [...$("hg").children].forEach((x,i)=>x.classList.toggle("sel",sel.includes(HEROES[i].id)));$("go").disabled=sel.length!==2;
+   team=sel.map(id=>({...H(id),hp:70,max:70}));hud()};$("hg").appendChild(b)});
+ $("go").onclick=()=>{team=sel.map(id=>({...H(id),hp:70,max:70}));battle()}}
+// ---- battle ----
+function battle(){F={...FOES[fi],max:FOES[fi].hp,known:false};phase=0;turn=0;hud();say(`<b>${F.n}</b> attacks! Your team: <b>${team.map(h=>h.n).join(" & ")}</b>.`);setTimeout(heroTurn,1100)}
+const alive=()=>team.filter(h=>h.hp>0);
+const curWeak=()=>F.boss?F.weak[phase]:F.weak[0];
+function hud(){$("team").innerHTML=(team.length?team:[]).map((h,i)=>`<div class="unit ${F&&i===turn%2&&h.hp>0?"act":""} ${h.hp<=0?"ko":""}"><b style="color:${h.hair}">${h.n}</b> <span style="opacity:.8">[${TY[h.ty].n}]</span><div class="hp"><i style="width:${h.hp/h.max*100}%"></i></div>${h.hp}/${h.max}</div>`).join("")||"<b>Choose your team…</b>";
+ if(!F){$("ename").textContent=FOES[fi].n;$("ehp").style.width="100%";$("etxt").textContent="";$("eweak").textContent="WEAK: ???";return}
  $("ehp").style.width=Math.max(0,F.hp)/F.max*100+"%";$("etxt").textContent=Math.max(0,F.hp)+"/"+F.max;$("ename").textContent=F.n;
- $("eweak").textContent=F.known?"WEAK: "+SK[curWeak()].n:"WEAK: ???"}
+ $("eweak").textContent="WEAK: "+(F.known?TY[curWeak()].n:"???")}
 function say(h){panel.innerHTML=`<div id="log">${h}</div>`}
-function menu(){busy=0;say(`Your turn. Choose a skill. <span style="color:var(--gold)">Hint: ${hint()}</span>`);
- const g=document.createElement("div");g.className="grid";
- for(const k in SK){const b=document.createElement("button");b.innerHTML=`<span style="color:${SK[k].c}">◆ ${SK[k].n}</span><small>${SK[k].d}</small>`;b.onclick=()=>ask(k);g.appendChild(b)}
- panel.appendChild(g)}
-function hint(){const w=curWeak();return{lens:"It pushes solutions before anyone has named a problem.",
- whys:"Its symptoms keep regenerating. Dig beneath them.",outcome:"It measures success by how much it ships."}[w]||""}
 function pick(k){const pool=QS[k];used[k]=used[k]||[];if(used[k].length>=pool.length)used[k]=[];
  let i;do{i=Math.random()*pool.length|0}while(used[k].includes(i));used[k].push(i);return pool[i]}
-function ask(k){if(busy)return;busy=1;const q=pick(k),opts=shuffle([0,1,2].map(i=>({t:q[i+1],ok:i===q[4]})));
- say(`<span style="color:${SK[k].c}">◆ ${SK[k].n}</span> charging… answer to land it!`);
+function heroTurn(){let i=turn%2;if(team[i].hp<=0){turn++;i=turn%2}const h=team[i];hud();
+ const q=pick(h.ty),opts=shuffle([0,1,2].map(j=>({t:q[j+1],ok:j===q[4]})));
+ say(`<b style="color:${h.hair}">${h.n}</b>'s turn [${TY[h.ty].n}]. Answer to land the attack!`);
  const qd=document.createElement("div");qd.className="q";qd.textContent=q[0];panel.appendChild(qd);
  const g=document.createElement("div");g.className="grid";g.style.gridTemplateColumns="1fr";
  opts.forEach(o=>{const b=document.createElement("button");b.textContent=o.t;b.onclick=()=>{
   [...g.children].forEach((x,j)=>{x.disabled=1;if(opts[j].ok)x.className="ok"});if(!o.ok)b.className="no";
-  setTimeout(()=>resolve(k,o.ok),900)};g.appendChild(b)});panel.appendChild(g)}
-function resolve(k,ok){let msg;const weak=k===curWeak();
- let d=0;
- if(!ok){msg=`✗ Wrong answer. Your <b>${SK[k].n}</b> fizzles!`}
- else if(weak){d=34+(Math.random()*8|0);msg=`✓ <b>WEAKNESS BREAK!</b> ${SK[k].n} deals <b>${d}</b> damage!`}
- else{d=8+(Math.random()*5|0);msg=`✓ Correct, but ${F.n} resists. Only <b>${d}</b> damage.`}
- castFx(k,ok,weak,d,()=>{if(ok){F.hp-=d;if(weak)F.known=true}hud()});say(msg);
- const after=F.hp-(ok?d:0);
- if(F.boss&&phase===0&&after<=F.max/2&&after>0){setTimeout(()=>{phase=1;F.known=false;hud();say(`<b>${F.n}</b> transforms! "Fine, I'll fix the symptoms instead!" Its weakness has changed.`);setTimeout(()=>foeTurn(ok),1400)},1200);return}
- if(after<=0){setTimeout(win,1500);return}
- setTimeout(()=>foeTurn(ok),1500)}
-function foeTurn(ok){const d=Math.round(F.atk*(ok?1:1.4)+Math.random()*4);
- lungeE=14;fx.push({proj:1,k:"foe",x:F.boss?205:215,y:110,tx:72,ty:110,c:"#ff5f6d",life:0,dur:22,end(){P.hp=Math.max(0,P.hp-d);shake=8;hurtP=10;burst(72,110,"#ff5f6d",14);num(72,90,"-"+d,"#ff5f6d");hud()}});
+  setTimeout(()=>resolve(i,o.ok),800)};g.appendChild(b)});panel.appendChild(g)}
+async function resolve(i,ok){const h=team[i],weak=h.ty===curWeak();let d=0,msg;
+ if(!ok)msg=`✗ Wrong answer. ${h.n}'s attack fizzles!`;
+ else if(weak){d=36+(Math.random()*8|0);msg=`✓ <b>WEAKNESS BREAK!</b> ${h.n} deals <b>${d}</b>!`}
+ else{d=8+(Math.random()*5|0);msg=`✓ Correct, but ${F.n} resists ${TY[h.ty].n}. Only <b>${d}</b>.`}
+ say(msg);await castFx(i,ok,weak,d);if(ok){F.hp-=d;if(weak)F.known=true}hud();await wait(700);
+ if(F.hp<=0)return win();
+ if(F.boss&&phase===0&&F.hp<=F.max/2){phase=1;F.known=false;hud();say(`<b>${F.n}</b> transforms! "Fine, I'll count features shipped instead!" Its weakness has changed.`);flash=20;await wait(1800)}
+ turn++;
+ if(turn%2===0||alive().length===1&&turn%2===1){await foeTurn(ok)}
+ if(!alive().length)return lose();heroTurn()}
+async function foeTurn(ok){const tg=alive()[Math.random()*alive().length|0],ti=team.indexOf(tg);
+ const d=Math.round(F.atk*(ok?1:1.3)+Math.random()*5);
  const lines=["hurls a 40-page requirements doc","launches an untested pilot","demands a feature by Friday","cites a vanity metric"];
- say(`<b>${F.n}</b> ${lines[Math.random()*4|0]}! You take <b>${d}</b> damage.`);
- setTimeout(()=>P.hp<=0?lose():menu(),1500)}
-// --- attack effects ---
-let fx=[],lungeP=0,lungeE=0,hurtP=0;
+ say(`<b>${F.n}</b> ${lines[Math.random()*4|0]} at <b>${tg.n}</b>!`);
+ lungeE=14;await shoot({k:"foe",x:F.boss?205:215,y:110,tx:HX[ti]+8,ty:HY[ti]+12,c:"#ff5f6d"});
+ tg.hp=Math.max(0,tg.hp-d);shake=8;hurt[ti]=10;burst(HX[ti]+8,HY[ti]+12,"#ff5f6d",14);num(HX[ti]+8,HY[ti]-4,"-"+d,"#ff5f6d");hud();
+ if(tg.hp<=0)say(`<b>${tg.n}</b> is knocked out!`);await wait(1000)}
+function win(){const f=FOES[fi];
+ if(fi<FOES.length-1){panel.innerHTML=`<div class="big">★ ${f.n} defeated!<p style="color:var(--mute)">${f.debrief}</p><button id="nb">Scout the next enemy ▶</button></div>`;$("nb").onclick=()=>{fi++;draft()}}
+ else{panel.innerHTML=`<div class="big"><b style="color:var(--gold);font-size:1.3rem">★ VICTORY ★</b><p style="color:var(--mute)">${f.debrief}</p><small style="color:var(--mute)">Remember: problems before solutions · find the root cause · outcomes over outputs · Policy–Ops–Tech together.</small><br><button id="rb">Play again</button></div>`;$("rb").onclick=start}}
+function lose(){panel.innerHTML=`<div class="big"><b style="color:var(--bad)">TEAM DEFEATED</b><p style="color:var(--mute)">${F.n} wins this round. Re-read its profile: which product-thinking habit is it missing? Pick heroes whose type supplies it.</p><button id="rb">Re-draft this battle</button></div>`;$("rb").onclick=draft}
+// ---- effects ----
+const HX=[40,82],HY=[90,104];
 function burst(x,y,c,n){for(let i=0;i<n;i++){const a=Math.random()*6.28,s=1+Math.random()*3;fx.push({p:1,x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,c,life:0,dur:20+Math.random()*15})}}
 function num(x,y,txt,c,big){fx.push({n:1,x,y,txt,c,big,life:0,dur:45})}
-function castFx(k,ok,weak,d,onHit){lungeP=14;const tx=F.boss?232:235,ty=F.boss?105:112,c=SK[k].c;
- const shots=k==="whys"?5:k==="unite"?3:1;
- for(let i=0;i<shots;i++)setTimeout(()=>fx.push({proj:1,k,x:80,y:108,tx,ty,c:k==="unite"?["#4ef0ff","#ffd25e","#5dffa0"][i]:c,life:0,dur:24,fizzle:!ok,
-  end(){if(!ok){burst(this.x,this.y,"#777",6);if(i===shots-1)num(this.x,this.y-10,"MISS","#9a98c9");return}
-   burst(tx,ty,c,weak?10:4);if(i===shots-1){onHit();flash=weak?14:6;shake=weak?12:4;if(weak){burst(tx,ty,"#fff",20);fx.push({ring:1,x:tx,y:ty,c,life:0,dur:22});num(tx,ty-34,"BREAK!","#ffd25e",1)}num(tx,ty-20,"-"+d,weak?"#ffd25e":"#fff",weak)}}}),i*110)}
+function shoot(o){return new Promise(r=>{let done=0;const f={proj:1,life:0,dur:24,...o,x0:o.x,y0:o.y,end(p){if(done)return;done=1;r(p)}};fx.push(f);
+ setTimeout(()=>{if(!done){f.life=f.dur;f.end({x:f.tx,y:f.ty})}},700)})}
+async function castFx(i,ok,weak,d){const h=team[i];lunge[i]=14;const tx=F.boss?232:235,ty=F.boss?105:112,c=TY[h.ty].c;
+ const shots=h.ty==="whys"?5:h.ty==="unite"?3:1,ps=[];
+ for(let s=0;s<shots;s++){ps.push(shoot({k:h.ty,x:HX[i]+18,y:HY[i]+8,tx,ty,c:h.ty==="unite"?["#4ef0ff","#ffd25e","#5dffa0"][s]:c,fizzle:!ok}).then(p=>{if(ok)burst(tx,ty,c,weak?10:4);else burst(p.x,p.y,"#777",6)}));await wait(110)}
+ const last=await Promise.all(ps);
+ if(!ok){num(tx-40,ty-14,"MISS","#9a98c9");return}
+ flash=weak?14:6;shake=weak?12:4;
+ if(weak){burst(tx,ty,"#fff",20);fx.push({ring:1,x:tx,y:ty,c,life:0,dur:22});num(tx,ty-34,"BREAK!","#ffd25e",1)}
+ num(tx,ty-20,"-"+d,weak?"#ffd25e":"#fff",weak)}
+const cx=$("c").getContext("2d");
+function px(x,y,w,h,c){cx.fillStyle=c;cx.fillRect(x|0,y|0,w,h)}
 function drawFx(){fx=fx.filter(f=>{f.life++;const p=f.life/f.dur;
- if(f.proj){const q=f.fizzle?Math.min(p,.55):p;f.x=f.x0??(f.x0=f.x);f.y0??(f.y0=f.y);
-  const x=f.x0+(f.tx-f.x0)*q,y=f.y0+(f.ty-f.y0)*q-Math.sin(q*Math.PI)*(f.k==="outcome"?30:10);
-  for(let j=1;j<5;j++){cx.globalAlpha=.25;const qq=Math.max(0,q-j*.04);px(f.x0+(f.tx-f.x0)*qq,f.y0+(f.ty-f.y0)*qq-Math.sin(qq*Math.PI)*(f.k==="outcome"?30:10),3,3,f.c)}cx.globalAlpha=1;
+ if(f.proj){const q=f.fizzle?Math.min(p,.55):p,arc=f.k==="outcome"?30:10;
+  const at=qq=>[f.x0+(f.tx-f.x0)*qq,f.y0+(f.ty-f.y0)*qq-Math.sin(qq*Math.PI)*arc];const[x,y]=at(q);
+  if(f.fizzle&&p>.55)cx.globalAlpha=1-(p-.55)/.45;
+  for(let j=1;j<5;j++){const[a,b]=at(Math.max(0,q-j*.04));const ga=cx.globalAlpha;cx.globalAlpha=ga*.25;px(a,b,3,3,f.c);cx.globalAlpha=ga}
   if(f.k==="lens"){cx.strokeStyle=f.c;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,5+Math.sin(f.life)*2,0,6.28);cx.stroke();px(x-1,y-1,3,3,"#fff")}
-  else if(f.k==="outcome"){const r=7;for(let a=0;a<4;a++){const an=a*1.57+f.life*.4;px(x+Math.cos(an)*r-1,y+Math.sin(an)*r-1,3,3,f.c)}px(x-3,y-3,7,7,"#fff")}
+  else if(f.k==="outcome"){for(let a=0;a<4;a++){const an=a*1.57+f.life*.4;px(x+Math.cos(an)*7-1,y+Math.sin(an)*7-1,3,3,f.c)}px(x-3,y-3,7,7,"#fff")}
   else if(f.k==="foe"){px(x-4,y-5,9,11,"#fff");px(x-3,y-4,7,1,"#999");px(x-3,y-1,7,1,"#999");px(x-3,y+2,5,1,"#999")}
   else{px(x-3,y-3,7,7,f.c);px(x-1,y-1,3,3,"#fff")}
-  if(f.fizzle&&p>.55){cx.globalAlpha=1-(p-.55)/.45}
-  if(f.life>=f.dur){f.x=x;f.y=y;f.end&&f.end();return false}cx.globalAlpha=1;return true}
+  cx.globalAlpha=1;if(f.life>=f.dur){f.end({x,y});return false}return true}
  if(f.p){f.x+=f.vx;f.y+=f.vy;f.vy+=.12;cx.globalAlpha=1-p;px(f.x,f.y,2,2,f.c);cx.globalAlpha=1}
  if(f.ring){cx.globalAlpha=1-p;cx.strokeStyle=f.c;cx.lineWidth=3;cx.beginPath();cx.arc(f.x,f.y,4+p*40,0,6.28);cx.stroke();cx.globalAlpha=1}
  if(f.n){cx.globalAlpha=p>.7?(1-p)/.3:1;cx.font=(f.big?"bold 14px":"bold 10px")+" monospace";cx.textAlign="center";cx.fillStyle="#000";cx.fillText(f.txt,f.x+1,f.y-p*16+1);cx.fillStyle=f.c;cx.fillText(f.txt,f.x,f.y-p*16);cx.globalAlpha=1}
  return f.life<f.dur})}
-function win(){if(fi<FOES.length-1){fi++;P.hp=Math.min(P.max,P.hp+30);
- panel.innerHTML=`<div class="big">★ ${FOES[fi-1].n} defeated! You recover 30 HP.<br><button id="nb">Face the boss ▶</button></div>`;$("nb").onclick=nextFoe}
- else panel.innerHTML=`<div class="big"><b style="color:var(--gold);font-size:1.3rem">★ VICTORY ★</b><br>The Feature Factory crumbles. Real problems, real outcomes.<br><small style="color:var(--mute)">Remember: problems before solutions · outcomes over outputs · Policy–Ops–Tech together.</small><br><button id="rb">Play again</button></div>`,$("rb").onclick=start}
-function lose(){panel.innerHTML=`<div class="big"><b style="color:var(--bad)">DEFEATED</b><br>${F.n} wins this round. Re-read the hints: each enemy's behaviour reveals its weakness.<br><button id="rb">Try again</button></div>`;$("rb").onclick=start}
-// --- pixel rendering ---
-const cx=$("c").getContext("2d");
-function px(x,y,w,h,c){cx.fillStyle=c;cx.fillRect(x|0,y|0,w,h)}
-function hero(x,y){const b=Math.sin(t/12)*1.5;y+=b;
- px(x+4,y,8,8,"#ffe0c2");px(x+3,y-2,10,4,"#4ef0ff");px(x+2,y,2,6,"#4ef0ff");px(x+6,y+3,2,2,"#111");px(x+10,y+3,2,2,"#111");
- px(x+2,y+8,12,10,"#3b3bd6");px(x+6,y+9,4,8,"#ffd25e");px(x,y+9,2,8,"#ffe0c2");px(x+14,y+9,2,8,"#ffe0c2");
- px(x+16,y+2,2,16,"#c9c9ff");px(x+15,y,4,3,"#4ef0ff");px(x+3,y+18,4,6,"#222");px(x+9,y+18,4,6,"#222")}
+// ---- sprites ----
+function hero(x,y,h,ko){if(ko){px(x,y+20,22,6,h.suit);px(x+18,y+19,7,7,"#ffe0c2");px(x+18,y+17,7,3,h.hair);return}
+ const b=Math.sin(t/12+x)*1.5;y+=b;
+ px(x+4,y,8,8,"#ffe0c2");px(x+3,y-2,10,4,h.hair);px(x+2,y,2,6,h.hair);px(x+6,y+3,2,2,"#111");px(x+10,y+3,2,2,"#111");
+ px(x+2,y+8,12,10,h.suit);px(x+6,y+9,4,8,h.hair);px(x,y+9,2,8,"#ffe0c2");px(x+14,y+9,2,8,"#ffe0c2");
+ const w={lens:()=>{px(x+16,y+2,6,6,"#fff8");px(x+17,y+3,4,4,h.hair)},whys:()=>{px(x+16,y+4,2,14,"#c9c9ff");px(x+15,y+1,4,4,"#ffd25e")},
+  outcome:()=>{px(x+16,y+6,6,2,"#c9c9ff");px(x+21,y+4,2,6,h.hair)},unite:()=>{px(x+16,y+3,3,3,"#4ef0ff");px(x+19,y+6,3,3,"#ffd25e");px(x+16,y+9,3,3,"#5dffa0")}};
+ w[h.ty]();px(x+3,y+18,4,6,"#222");px(x+9,y+18,4,6,"#222")}
 function slime(x,y,c){const s=Math.sin(t/8)*2;px(x+4,y+6-s,32,26+s,c);px(x,y+14-s,40,18+s,c);px(x+8,y+2-s,24,6,c);
  px(x+10,y+12,6,6,"#fff");px(x+24,y+12,6,6,"#fff");px(x+12,y+14,3,3,"#111");px(x+26,y+14,3,3,"#111");px(x+14,y+24,12,2,"#111");
  px(x+30,y-6-s,3,10,"#aaa");px(x+28,y-10-s,7,5,"#ffd25e")}
@@ -144,16 +178,17 @@ function boss(x,y,c){const s=Math.sin(t/14)*2;px(x,y+10+s,56,46,"#5a5a7a");px(x+
  for(let i=0;i<3;i++)px(x+8+i*16,y-4+s,8,14,"#3a3a55");
  const sm=(t/6|0)%3;for(let i=0;i<3;i++)px(x+9+i*16,y-10-((sm+i)%3)*3+s,6,5,"#9a98c9");
  px(x+12,y+22+s,10,8,phase?"#ff5fae":"#fff");px(x+34,y+22+s,10,8,phase?"#ff5fae":"#fff");px(x+15,y+25+s,4,4,"#111");px(x+37,y+25+s,4,4,"#111");
- for(let i=0;i<5;i++)px(x+12+i*7,y+40+s,5,4,"#111");
- px(x+58,y+30+s,12,10,"#ffd25e");px(x+60,y+32+s,8,2,"#111")}
+ for(let i=0;i<5;i++)px(x+12+i*7,y+40+s,5,4,"#111");px(x+58,y+30+s,12,10,"#ffd25e");px(x+60,y+32+s,8,2,"#111")}
 function loop(){t++;px(0,0,320,160,"#05051a");
  for(const s of stars){s[0]-=s[2]*.3;if(s[0]<0)s[0]=320;px(s[0],s[1],1,1,s[2]>.7?"#4ef0ff":"#ffffff88")}
  px(0,128,320,32,"#151540");for(let i=0;i<320;i+=16)px(i+(t/2%16),128,8,1,"#3a3a7a");
- const sx=shake?(Math.random()*4-2):0;if(shake)shake--;
- cx.save();cx.translate(sx,0);
- const lp=lungeP?Math.sin(lungeP/14*Math.PI)*10:0,le=lungeE?Math.sin(lungeE/14*Math.PI)*10:0;if(lungeP)lungeP--;if(lungeE)lungeE--;
- if(hurtP){hurtP--;cx.globalAlpha=.4+.6*(hurtP%2)}hero(60+lp,98);cx.globalAlpha=1;
- if(F&&F.hp>0){if(flash){flash--;cx.globalAlpha=.4+.6*(flash%2)}F.shape==="boss"?boss(205-le,70,F.col):slime(215-le,96,F.col);cx.globalAlpha=1}
+ const sx=shake?(Math.random()*4-2):0;if(shake)shake--;cx.save();cx.translate(sx,0);
+ (team||[]).forEach((h,i)=>{const l=lunge[i]?Math.sin(lunge[i]/14*Math.PI)*10:0;if(lunge[i])lunge[i]--;
+  if(hurt[i]){hurt[i]--;cx.globalAlpha=.4+.6*(hurt[i]%2)}
+  if(F&&i===turn%2&&h.hp>0)px(HX[i]+6+0,HY[i]-12+Math.sin(t/6)*2,4,4,"#ffd25e");
+  hero(HX[i]+l,HY[i],h,h.hp<=0);cx.globalAlpha=1});
+ const foe=F||FOES[fi],le=lungeE?Math.sin(lungeE/14*Math.PI)*10:0;if(lungeE)lungeE--;
+ if(foe&&(!F||F.hp>0)){if(flash){flash--;cx.globalAlpha=.4+.6*(flash%2)}foe.shape==="boss"?boss(205-le,70,foe.col):slime(215-le,96,foe.col);cx.globalAlpha=1}
  drawFx();cx.restore();requestAnimationFrame(loop)}
 start();loop();
 </script></body></html>
