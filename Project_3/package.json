@@ -1,0 +1,17 @@
+{
+  "name": "project_3",
+  "version": "1.0.0",
+  "description": "Group lunch orders for office kakis",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0"
+  }
+}
