@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cat Food Fit Check</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🐱 Cat Food Fit Check</h1>
+    <p class="tag">Is this food a good fit for <em>your</em> cat?</p>
+  </header>
+
+  <main>
+    <!-- 1. Cats -->
+    <section class="card" id="cats-section">
+      <h2>1 · Your cats</h2>
+      <div id="cat-list" class="chips"></div>
+      <details id="cat-form-wrap">
+        <summary>+ Add a cat</summary>
+        <form id="cat-form">
+          <label>Name <input name="name" required maxlength="30" placeholder="Mochi"></label>
+          <label>Breed <select name="breed" id="breed-select" required></select></label>
+          <label>Age
+            <select name="age">
+              <option value="kitten">Kitten (under 1 yr)</option>
+              <option value="adult" selected>Adult (1–10 yrs)</option>
+              <option value="senior">Senior (11+ yrs)</option>
+            </select>
+          </label>
+          <label>Lifestyle
+            <select name="lifestyle">
+              <option value="indoor" selected>Indoor</option>
+              <option value="outdoor">Goes outdoors</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" name="lose"> Trying to lose weight</label>
+          <button type="submit">Save cat</button>
+        </form>
+      </details>
+    </section>
+
+    <!-- 2. Food -->
+    <section class="card">
+      <h2>2 · Find the food</h2>
+      <form id="search-form" class="row">
+        <input id="search-input" placeholder="Brand/name or barcode, e.g. Royal Canin" required>
+        <button type="submit">Search</button>
+      </form>
+      <p class="hint">Data from <a href="https://world.openpetfoodfacts.org" target="_blank" rel="noopener">Open Pet Food Facts</a>. Can't find it? <button class="link" id="manual-btn" type="button">Enter it manually</button></p>
+      <div id="results" class="results"></div>
+    </section>
+
+    <!-- 3. Label -->
+    <section class="card hidden" id="label-section">
+      <h2>3 · Check the label</h2>
+      <div id="food-head" class="food-head"></div>
+      <p class="hint">Copy the “Analytical constituents” / “Guaranteed analysis” from the bag. We filled in what the database knew.</p>
+      <form id="label-form" class="grid">
+        <label>Food name <input name="name" required></label>
+        <label>Type
+          <select name="type">
+            <option value="dry">Dry (kibble)</option>
+            <option value="wet">Wet (can/pouch)</option>
+          </select>
+        </label>
+        <label>Protein % <input name="protein" type="number" step="0.1" min="0" max="100" required></label>
+        <label>Fat % <input name="fat" type="number" step="0.1" min="0" max="100" required></label>
+        <label>Fibre % <input name="fibre" type="number" step="0.1" min="0" max="100"></label>
+        <label>Moisture % <input name="moisture" type="number" step="0.1" min="0" max="95" placeholder="blank = typical"></label>
+        <button type="submit" class="wide">Check fit for <span id="for-cat">your cat</span></button>
+      </form>
+    </section>
+
+    <!-- 4. Verdict -->
+    <section class="card hidden" id="verdict-section" aria-live="polite"></section>
+
+    <!-- History -->
+    <section class="card">
+      <h2>My foods</h2>
+      <div id="history"><p class="hint">Foods you check appear here.</p></div>
+    </section>
+
+    <p class="disclaimer">A fun guide, not vet advice. Baselines: AAFCO cat nutrient minimums on a dry-matter basis. Ask your vet about health conditions.</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
