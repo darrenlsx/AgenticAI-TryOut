@@ -100,7 +100,7 @@ function draft(){const foe=FOES[fi];F=null;team=[];hud();let sel=[];
   const wrap=document.createElement("div");wrap.innerHTML=b.innerHTML;b.innerHTML="";b.appendChild(portrait(h));b.appendChild(wrap);$("hg").appendChild(b)});
  $("go").onclick=()=>{team=sel.map(id=>({...H(id),hp:70,max:70}));battle()}}
 // ---- battle ----
-function battle(){F={...FOES[fi],max:FOES[fi].hp,known:false};phase=0;turn=0;hud();say(`<b>${F.n}</b> attacks! Your team: <b>${team.map(h=>h.n).join(" & ")}</b>.`);setTimeout(heroTurn,1100)}
+function battle(){F={...FOES[fi],max:FOES[fi].hp,known:true};phase=0;turn=0;hud();say(`<b>${F.n}</b> attacks! Your team: <b>${team.map(h=>h.n).join(" & ")}</b>. Its weakness is revealed: ${tag(curWeak())}`);setTimeout(heroTurn,2000)}
 const alive=()=>team.filter(h=>h.hp>0);
 const curWeak=()=>F.boss?F.weak[phase]:F.weak[0];
 function hud(){$("team").innerHTML=(team.length?team:[]).map((h,i)=>`<div class="unit ${F&&i===turn%2&&h.hp>0?"act":""} ${h.hp<=0?"ko":""}"><b>${h.n}</b> ${tag(h.ty)}<div class="hp"><i style="width:${h.hp/h.max*100}%"></i></div>${h.hp}/${h.max}</div>`).join("")||"<b>Choose your team…</b>";
@@ -124,7 +124,7 @@ async function resolve(i,ok){const h=team[i],weak=h.ty===curWeak();let d=0,msg;
  else{d=8+(Math.random()*5|0);msg=`✓ Correct, but ${F.n} resists ${tag(h.ty)}. Only <b>${d}</b>.`}
  say(msg);await castFx(i,ok,weak,d);if(ok){F.hp-=d;if(weak)F.known=true}hud();await wait(700);
  if(F.hp<=0)return win();
- if(F.boss&&phase===0&&F.hp<=F.max/2){phase=1;F.known=false;hud();say(`<b>${F.n}</b> transforms! "Fine, I'll count features shipped instead!" Its weakness has changed.`);flash=20;await wait(1800)}
+ if(F.boss&&phase===0&&F.hp<=F.max/2){phase=1;hud();say(`<b>${F.n}</b> transforms! "Fine, I'll count features shipped instead!" Its weakness is now ${tag(curWeak())}`);flash=20;await wait(2200)}
  turn++;
  if(turn%2===0||alive().length===1&&turn%2===1){await foeTurn(ok)}
  if(!alive().length)return lose();heroTurn()}
