@@ -91,14 +91,21 @@ app.get('/api/orders', requireLogin, (req, res) => {
     FROM orders o
     JOIN users u ON u.id = o.organiser_id
     LEFT JOIN items i ON i.order_id = o.id
-    GROUP BY o.id ORDER BY o.id DESC LIMIT 50`).all();
-  // Who has added items to each order (for the avatar row).
+    -- All open orders, plus the 50 most recent placed ones.
+    WHERE o.status = 'open'
+       OR o.id IN (SELECT id FROM orders WHERE status = 'placed' ORDER BY id DESC LIMIT 50)
+    GROUP BY o.id ORDER BY o.id DESC`).all();
+  // Who is in each returned order: the organiser plus anyone who added items (for the avatar row).
+  const ids = JSON.stringify(orders.map(o => o.id));
   const participants = db.prepare(`
-    SELECT DISTINCT i.order_id, u.id, u.display_name FROM items i
-    JOIN users u ON u.id = i.user_id ORDER BY u.display_name`).all();
-  for (const o of orders) {
-    o.participants = participants.filter(p => p.order_id === o.id).map(p => ({ id: p.id, name: p.display_name }));
-  }
+    WITH ids AS (SELECT value AS id FROM json_each(?))
+    SELECT p.order_id, p.user_id, u.display_name FROM (
+      SELECT id AS order_id, organiser_id AS user_id FROM orders WHERE id IN (SELECT id FROM ids)
+      UNION
+      SELECT order_id, user_id FROM items WHERE order_id IN (SELECT id FROM ids)
+    ) p JOIN users u ON u.id = p.user_id ORDER BY u.display_name`).all(ids);
+  const byOrder = new Map(orders.map(o => [o.id, (o.participants = [])]));
+  for (const p of participants) byOrder.get(p.order_id).push({ id: p.user_id, name: p.display_name });
   res.json(orders);
 });
 
@@ -156,6 +163,10 @@ app.post('/api/orders/:id/payments/:userId', requireLogin, (req, res) => {
   if (order.organiser_id !== req.user.id) return bad(res, 403, 'Only the organiser can mark payments.');
   if (order.status !== 'placed') return bad(res, 409, 'Place the order before tracking payments.');
   const userId = Number(req.params.userId);
+  if (!Number.isInteger(userId)) return bad(res, 400, 'Invalid user id.');
+  if (!db.prepare('SELECT 1 FROM items WHERE order_id = ? AND user_id = ?').get(order.id, userId)) {
+    return bad(res, 404, 'That person has no items in this order.');
+  }
   const exists = db.prepare('SELECT 1 FROM payments WHERE order_id = ? AND user_id = ?').get(order.id, userId);
   if (exists) db.prepare('DELETE FROM payments WHERE order_id = ? AND user_id = ?').run(order.id, userId);
   else db.prepare('INSERT INTO payments (order_id, user_id) VALUES (?, ?)').run(order.id, userId);

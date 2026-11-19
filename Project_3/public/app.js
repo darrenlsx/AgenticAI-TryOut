@@ -12,7 +12,7 @@ function when(iso) {
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const startOf = x => new Date(x.getFullYear(), x.getMonth(), x.getDate());
   const days = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
-  if (days === 0) return `Today, ${time}`;
+  if (days <= 0) return `Today, ${time}`;
   if (days === 1) return `Yesterday, ${time}`;
   if (days > 1 && days < 7) return `${d.toLocaleDateString([], { weekday: 'short' })}, ${time}`;
   return `${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${time}`;
