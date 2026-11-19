@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Problems Before Solutions</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1f1d1a;--mute:#6b665e;--accent:#b4441c;--line:#e4dfd6;--card:#fff;--ok:#2f7d4a;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--fg:#ece8e1;--mute:#a39d93;--accent:#f08a5d;--line:#34312c;--card:#1f1e1b;--ok:#6cc58a;--bad:#f2867d}}
+:root[data-theme="dark"]{--bg:#171614;--fg:#ece8e1;--mute:#a39d93;--accent:#f08a5d;--line:#34312c;--card:#1f1e1b;--ok:#6cc58a;--bad:#f2867d}
+body{background:var(--bg);color:var(--fg);font:18px/1.6 Georgia,"Iowan Old Style",serif;margin:0}
+main{max-width:680px;margin:0 auto;padding:48px 16px 80px}
+.kicker{font:600 12px/1 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:2.1rem;line-height:1.15;margin:.4em 0 .2em}h2{font-size:1.3rem;margin:2em 0 .4em;border-top:1px solid var(--line);padding-top:1.2em}
+.lede{color:var(--mute);font-style:italic}a{color:var(--accent)}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin:1em 0}
+table{border-collapse:collapse;width:100%;font-size:.95rem}td,th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+ol.whys li{margin:.3em 0}
+.q{margin:1.4em 0}.q p{font-weight:600;margin:.2em 0 .5em}
+.q button{display:block;width:100%;text-align:left;font:16px system-ui,sans-serif;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:6px 0;cursor:pointer}
+.q button.right{border-color:var(--ok);color:var(--ok)}.q button.wrong{border-color:var(--bad);color:var(--bad)}
+.fb{font:15px system-ui,sans-serif;color:var(--mute);min-height:1.2em}
+textarea{width:100%;box-sizing:border-box;min-height:70px;font:16px system-ui,sans-serif;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
+small,.note{color:var(--mute);font-size:.85rem}
+</style></head><body><main>
+<div class="kicker">Product Thinking · Lesson 1 of IDG pathway</div>
+<h1>Problems before solutions</h1>
+<p class="lede">The win: by the end, you can take a "let's build an AI chatbot" request and push it back to the real problem underneath.</p>
+
+<h2>1. The idea in one line</h2>
+<p>Singapore's Institute of Digital Government frames product thinking as asking better questions <em>before</em> reaching for a solution — define, scope and frame the problem first (<a href="https://www.idg.gov.sg/product-thinking/">IDG, Product Thinking</a>). Its first module puts it bluntly: <q>Great digital products start with problems, not solutions.</q> (<a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking1/">Module 1</a>)</p>
+<p>Why it matters for AI work: a team can execute brilliantly and still fail, because it solved the wrong problem.</p>
+
+<h2>2. Three principles</h2>
+<table>
+<tr><th>Principle</th><th>What it means in practice</th></tr>
+<tr><td><b>Problems before solutions</b></td><td>Diagnose first. "Use GenAI" is not a problem.</td></tr>
+<tr><td><b>Outcomes over outputs</b></td><td>Success = the change achieved (e.g. fewer repeat calls), not features shipped (e.g. "chatbot launched").</td></tr>
+<tr><td><b>Policy–Ops–Tech integration</b></td><td>Policy, operations and technology people work on the problem together, with clear accountability.</td></tr>
+</table>
+<p class="note">Source: <a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking1/">IDG Module 1</a>. Successful products often began by solving one specific problem for one defined user group, then expanded.</p>
+
+<h2>3. The tool: Five Whys</h2>
+<p>Ask "why?" repeatedly to move from <b>symptom</b> to <b>cause</b> (<a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking2/">Module 2</a>). An illustrative example (mine, not IDG's):</p>
+<div class="box"><b>Request:</b> "Build an AI chatbot for our hotline."
+<ol class="whys">
+<li>Why? — Call volume is overwhelming officers.</li>
+<li>Why? — Most calls ask about application status.</li>
+<li>Why? — Applicants can't see their status anywhere.</li>
+<li>Why? — The status lives in a back-office system with no citizen view.</li>
+<li>Why? — Nobody owned the post-submission experience.</li>
+</ol>
+Maybe the fix is a status notification, not a chatbot.</div>
+<p>IDG's caution: problems rarely have a single root cause. Pick a cause that is <b>within your control</b> and <b>closely connected to the outcome</b> you want to change.</p>
+
+<h2>4. Check yourself</h2>
+<p class="note">Answer from memory — no scrolling up. Effortful recall is what makes it stick.</p>
+<div id="quiz"></div>
+
+<h2>5. Try it on something real</h2>
+<p>Pick a problem from your own work or your agentic-AI project. Write five whys. Then circle the one cause you can actually act on.</p>
+<textarea id="whys" placeholder="Problem: …&#10;Why 1: …"></textarea>
+<p class="note">Your notes stay in this browser only. Paste them to your teacher (Claude) for feedback.</p>
+
+<h2>Read next</h2>
+<p><b>Primary source:</b> <a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking2/">IDG Module 2 — Start With The Whys</a> (~10 min).<br>
+<b>Next lesson:</b> writing a 4Cs problem statement (Clarity, Consequence, Cause, Confirmation).</p>
+<div class="box">💬 Anything unclear? Ask your teacher (Claude) follow-up questions — e.g. "Is my root cause too deep?" or "Give me a harder Five Whys case."</div>
+</main>
+<script>
+const Q=[
+{p:"A team reports success as \"launched chatbot with 12 features.\" What principle does this miss?",o:["Outcomes over outputs","Problems before solutions","Policy-Ops-Tech integration"],a:0,e:"Features are outputs. Success should be the change achieved."},
+{p:"What is the Five Whys mainly used for?",o:["Ranking competing feature ideas","Estimating build cost and effort","Moving from symptom to cause"],a:2,e:"It digs from what you see to why it happens."},
+{p:"Several root causes appear. Which should you pick to fix?",o:["The deepest one you can find","One you control, tied to outcome","The one cheapest to automate"],a:1,e:"IDG: choose causes within your control and close to the outcome."},
+{p:"\"We need to use GenAI in our agency.\" Is this a problem statement?",o:["Yes, it names the technology","No, it is a solution first","Yes, if leadership approved it"],a:1,e:"It starts from a solution. Ask what problem it would solve."}];
+const el=document.getElementById('quiz');
+Q.forEach((q,i)=>{const d=document.createElement('div');d.className='q';d.innerHTML='<p>'+(i+1)+'. '+q.p+'</p>';const fb=document.createElement('div');fb.className='fb';
+q.o.forEach((t,j)=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>{d.querySelectorAll('button').forEach(x=>x.className='');b.className=j===q.a?'right':'wrong';fb.textContent=(j===q.a?'✓ ':'✗ Try again. ')+(j===q.a?q.e:'');};d.appendChild(b)});d.appendChild(fb);el.appendChild(d)});
+const ta=document.getElementById('whys');try{ta.value=localStorage.getItem('pt-whys')||''}catch(e){}ta.oninput=()=>{try{localStorage.setItem('pt-whys',ta.value)}catch(e){}};
+</script></body></html>
