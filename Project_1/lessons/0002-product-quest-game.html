@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Product Quest</title>
+<style>
+:root{--bg:#0b0b1e;--panel:#15153a;--line:#3a3a7a;--fg:#ecebff;--mute:#9a98c9;--cyan:#4ef0ff;--pink:#ff5fae;--gold:#ffd25e;--ok:#5dffa0;--bad:#ff5f6d}
+:root[data-theme="light"]{--bg:#e9e8ff;--panel:#fff;--line:#b9b7e8;--fg:#1b1a3a;--mute:#5a5890;--cyan:#0a8ea0;--pink:#c4246f;--gold:#9a6b00;--ok:#16884a;--bad:#c42633}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 "Courier New",ui-monospace,monospace}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.6rem;margin:.2em 0;color:var(--cyan);letter-spacing:.08em;text-shadow:0 0 12px var(--cyan)}
+.sub{color:var(--mute);margin:0 0 12px}
+#stage{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;background:#05051a}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.bars{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;padding:8px 10px;gap:10px;pointer-events:none}
+.bar{flex:1;max-width:46%;font-size:12px;color:#fff;text-shadow:0 1px 2px #000}
+.hp{height:10px;background:#222;border:1px solid #fff5;border-radius:3px;overflow:hidden;margin-top:3px}
+.hp i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#b6ff5d);transition:width .4s}
+.bar.enemy .hp i{background:linear-gradient(90deg,var(--pink),#ff9a5f)}
+.weak{font-size:11px;color:var(--gold)}
+#panel{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:14px;margin-top:12px;min-height:180px}
+#log{color:var(--mute);min-height:2.6em;margin-bottom:10px}
+#log b{color:var(--fg)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+button{font:inherit;color:var(--fg);background:transparent;border:2px solid var(--line);border-radius:8px;padding:10px;text-align:left;cursor:pointer}
+button:hover,button:focus-visible{border-color:var(--cyan);outline:none;box-shadow:0 0 10px var(--cyan)}
+button small{display:block;color:var(--mute);font-size:12px}
+button.ok{border-color:var(--ok);color:var(--ok)}button.no{border-color:var(--bad);color:var(--bad)}
+.q{font-weight:bold;margin-bottom:8px}
+.big{text-align:center;padding:10px}
+.big button{text-align:center;display:inline-block;margin-top:10px;border-color:var(--cyan)}
+.foot{color:var(--mute);font-size:12px;margin-top:14px}
+.foot a{color:var(--cyan)}
+</style></head><body><main>
+<h1>★ PRODUCT QUEST ★</h1>
+<p class="sub">A turn-based battle based on IDG's <a style="color:var(--cyan)" href="https://www.idg.gov.sg/product-thinking/">Product Thinking</a> pathway. Pick the skill that hits the enemy's weakness, then answer correctly to land it.</p>
+<div id="stage"><canvas id="c" width="320" height="160"></canvas>
+<div class="bars"><div class="bar"><b>YOU · Pathfinder</b><div class="hp"><i id="php"></i></div><span id="ptxt"></span></div>
+<div class="bar enemy" style="text-align:right"><b id="ename"></b><div class="hp"><i id="ehp"></i></div><span id="etxt"></span> <span class="weak" id="eweak"></span></div></div></div>
+<div id="panel"></div>
+<p class="foot">Lesson 1 recap: <a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking1/">IDG Module 1</a> · <a href="https://www.idg.gov.sg/guides-resources/ai-301-build-with-ai/productthinking2/">Module 2 (Five Whys)</a>. Stuck on a concept? Ask your teacher (Claude) a follow-up question.</p>
+</main>
+<script>
+const SK={
+ lens:{n:"Problem Lens",d:"Problems before solutions",c:"#4ef0ff"},
+ whys:{n:"Five Whys",d:"Symptom → root cause",c:"#ffd25e"},
+ outcome:{n:"Outcome Strike",d:"Outcomes over outputs",c:"#ff5fae"},
+ unite:{n:"Triad Link",d:"Policy + Ops + Tech",c:"#5dffa0"}};
+const QS={
+ lens:[["Your boss says \"We need an AI chatbot.\" First move?","Ask what problem it solves","Pick the best chatbot vendor","Start building a quick demo",0],
+  ["Which is a problem, not a solution?","Officers miss urgent emails","Deploy GenAI across agency","Build a new mobile app",0],
+  ["Successful products often began by…","Adding every feature early","Solving one specific problem","Copying a rival's product",1]],
+ whys:[["What is the Five Whys used for?","Ranking feature ideas fast","Estimating the build effort","Moving from symptom to cause",2],
+  ["Several root causes appear. Which to fix?","The deepest one you found","One you control, near outcome","The cheapest one to automate",1],
+  ["\"Calls are overwhelming staff.\" Best next question?","Why are people calling?","Which bot should we buy?","How many staff to hire?",0]],
+ outcome:[["Which one is an outcome?","Chatbot launched in March","Twelve features delivered","Repeat calls dropped by 30%",2],
+  ["\"Launched app with 12 features\" misses which idea?","Outcomes over outputs","Policy-Ops-Tech links","Problems before fixes",0],
+  ["Success should be defined by…","Features that were shipped","The change that was achieved","Lines of code that were written",1]],
+ unite:[["Who should frame the problem together?","Only the tech team alone","Policy, ops and tech people","An outside vendor only",1],
+  ["Why integrate Policy, Ops and Tech?","Tech alone misses real constraints","It makes meetings much longer","Vendors require it by contract",0]]};
+const FOES=[
+ {n:"SOLUTIONITIS",hp:80,atk:14,weak:["lens"],taunt:"\"Just build the chatbot already!\"",col:"#ff5fae",shape:"slime"},
+ {n:"THE FEATURE FACTORY",hp:140,atk:18,weak:["whys","outcome"],boss:1,taunt:"\"Ship more features! Count the outputs!\"",col:"#ff9a5f",shape:"boss"}];
+let P,F,fi,used,phase,busy,flash=0,shake=0,t=0,stars=[];
+for(let i=0;i<60;i++)stars.push([Math.random()*320,Math.random()*160,Math.random()]);
+const $=id=>document.getElementById(id),panel=$("panel");
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+function start(){P={hp:100,max:100};fi=0;used={};nextFoe()}
+function nextFoe(){F={...FOES[fi],max:FOES[fi].hp,known:false};phase=0;hud();
+ say(`<b>${F.n}</b> appears! ${F.taunt}`);setTimeout(menu,900)}
+function curWeak(){return F.boss?F.weak[phase]:F.weak[0]}
+function hud(){$("php").style.width=P.hp/P.max*100+"%";$("ptxt").textContent=P.hp+"/"+P.max;
+ $("ehp").style.width=Math.max(0,F.hp)/F.max*100+"%";$("etxt").textContent=Math.max(0,F.hp)+"/"+F.max;$("ename").textContent=F.n;
+ $("eweak").textContent=F.known?"WEAK: "+SK[curWeak()].n:"WEAK: ???"}
+function say(h){panel.innerHTML=`<div id="log">${h}</div>`}
+function menu(){busy=0;say(`Your turn. Choose a skill. <span style="color:var(--gold)">Hint: ${hint()}</span>`);
+ const g=document.createElement("div");g.className="grid";
+ for(const k in SK){const b=document.createElement("button");b.innerHTML=`<span style="color:${SK[k].c}">◆ ${SK[k].n}</span><small>${SK[k].d}</small>`;b.onclick=()=>ask(k);g.appendChild(b)}
+ panel.appendChild(g)}
+function hint(){const w=curWeak();return{lens:"It pushes solutions before anyone has named a problem.",
+ whys:"Its symptoms keep regenerating. Dig beneath them.",outcome:"It measures success by how much it ships."}[w]||""}
+function pick(k){const pool=QS[k];used[k]=used[k]||[];if(used[k].length>=pool.length)used[k]=[];
+ let i;do{i=Math.random()*pool.length|0}while(used[k].includes(i));used[k].push(i);return pool[i]}
+function ask(k){if(busy)return;busy=1;const q=pick(k),opts=shuffle([0,1,2].map(i=>({t:q[i+1],ok:i===q[4]})));
+ say(`<span style="color:${SK[k].c}">◆ ${SK[k].n}</span> charging… answer to land it!`);
+ const qd=document.createElement("div");qd.className="q";qd.textContent=q[0];panel.appendChild(qd);
+ const g=document.createElement("div");g.className="grid";g.style.gridTemplateColumns="1fr";
+ opts.forEach(o=>{const b=document.createElement("button");b.textContent=o.t;b.onclick=()=>{
+  [...g.children].forEach((x,j)=>{x.disabled=1;if(opts[j].ok)x.className="ok"});if(!o.ok)b.className="no";
+  setTimeout(()=>resolve(k,o.ok),900)};g.appendChild(b)});panel.appendChild(g)}
+function resolve(k,ok){let msg;const weak=k===curWeak();
+ if(!ok){msg=`✗ Wrong answer. Your <b>${SK[k].n}</b> fizzles!`}
+ else if(weak){const d=34+(Math.random()*8|0);F.hp-=d;F.known=true;flash=12;shake=10;msg=`✓ <b>WEAKNESS BREAK!</b> ${SK[k].n} deals <b>${d}</b> damage!`}
+ else{const d=8+(Math.random()*5|0);F.hp-=d;flash=6;msg=`✓ Correct, but ${F.n} resists. Only <b>${d}</b> damage.`}
+ hud();say(msg);
+ if(F.boss&&phase===0&&F.hp<=F.max/2&&F.hp>0){setTimeout(()=>{phase=1;F.known=false;hud();say(`<b>${F.n}</b> transforms! "Fine, I'll fix the symptoms instead!" Its weakness has changed.`);setTimeout(()=>foeTurn(ok),1400)},1200);return}
+ if(F.hp<=0){setTimeout(win,1100);return}
+ setTimeout(()=>foeTurn(ok),1200)}
+function foeTurn(ok){const d=Math.round(F.atk*(ok?1:1.4)+Math.random()*4);P.hp=Math.max(0,P.hp-d);shake=8;hud();
+ const lines=["hurls a 40-page requirements doc","launches an untested pilot","demands a feature by Friday","cites a vanity metric"];
+ say(`<b>${F.n}</b> ${lines[Math.random()*4|0]}! You take <b>${d}</b> damage.`);
+ setTimeout(()=>P.hp<=0?lose():menu(),1200)}
+function win(){if(fi<FOES.length-1){fi++;P.hp=Math.min(P.max,P.hp+30);
+ panel.innerHTML=`<div class="big">★ ${FOES[fi-1].n} defeated! You recover 30 HP.<br><button id="nb">Face the boss ▶</button></div>`;$("nb").onclick=nextFoe}
+ else panel.innerHTML=`<div class="big"><b style="color:var(--gold);font-size:1.3rem">★ VICTORY ★</b><br>The Feature Factory crumbles. Real problems, real outcomes.<br><small style="color:var(--mute)">Remember: problems before solutions · outcomes over outputs · Policy–Ops–Tech together.</small><br><button id="rb">Play again</button></div>`,$("rb").onclick=start}
+function lose(){panel.innerHTML=`<div class="big"><b style="color:var(--bad)">DEFEATED</b><br>${F.n} wins this round. Re-read the hints: each enemy's behaviour reveals its weakness.<br><button id="rb">Try again</button></div>`;$("rb").onclick=start}
+// --- pixel rendering ---
+const cx=$("c").getContext("2d");
+function px(x,y,w,h,c){cx.fillStyle=c;cx.fillRect(x|0,y|0,w,h)}
+function hero(x,y){const b=Math.sin(t/12)*1.5;y+=b;
+ px(x+4,y,8,8,"#ffe0c2");px(x+3,y-2,10,4,"#4ef0ff");px(x+2,y,2,6,"#4ef0ff");px(x+6,y+3,2,2,"#111");px(x+10,y+3,2,2,"#111");
+ px(x+2,y+8,12,10,"#3b3bd6");px(x+6,y+9,4,8,"#ffd25e");px(x,y+9,2,8,"#ffe0c2");px(x+14,y+9,2,8,"#ffe0c2");
+ px(x+16,y+2,2,16,"#c9c9ff");px(x+15,y,4,3,"#4ef0ff");px(x+3,y+18,4,6,"#222");px(x+9,y+18,4,6,"#222")}
+function slime(x,y,c){const s=Math.sin(t/8)*2;px(x+4,y+6-s,32,26+s,c);px(x,y+14-s,40,18+s,c);px(x+8,y+2-s,24,6,c);
+ px(x+10,y+12,6,6,"#fff");px(x+24,y+12,6,6,"#fff");px(x+12,y+14,3,3,"#111");px(x+26,y+14,3,3,"#111");px(x+14,y+24,12,2,"#111");
+ px(x+30,y-6-s,3,10,"#aaa");px(x+28,y-10-s,7,5,"#ffd25e")}
+function boss(x,y,c){const s=Math.sin(t/14)*2;px(x,y+10+s,56,46,"#5a5a7a");px(x+4,y+14+s,48,38,c);
+ for(let i=0;i<3;i++)px(x+8+i*16,y-4+s,8,14,"#3a3a55");
+ const sm=(t/6|0)%3;for(let i=0;i<3;i++)px(x+9+i*16,y-10-((sm+i)%3)*3+s,6,5,"#9a98c9");
+ px(x+12,y+22+s,10,8,phase?"#ff5fae":"#fff");px(x+34,y+22+s,10,8,phase?"#ff5fae":"#fff");px(x+15,y+25+s,4,4,"#111");px(x+37,y+25+s,4,4,"#111");
+ for(let i=0;i<5;i++)px(x+12+i*7,y+40+s,5,4,"#111");
+ px(x+58,y+30+s,12,10,"#ffd25e");px(x+60,y+32+s,8,2,"#111")}
+function loop(){t++;px(0,0,320,160,"#05051a");
+ for(const s of stars){s[0]-=s[2]*.3;if(s[0]<0)s[0]=320;px(s[0],s[1],1,1,s[2]>.7?"#4ef0ff":"#ffffff88")}
+ px(0,128,320,32,"#151540");for(let i=0;i<320;i+=16)px(i+(t/2%16),128,8,1,"#3a3a7a");
+ const sx=shake?(Math.random()*4-2):0;if(shake)shake--;
+ cx.save();cx.translate(sx,0);hero(60,98);
+ if(F&&F.hp>0){if(flash){flash--;cx.globalAlpha=.4+.6*(flash%2)}F.shape==="boss"?boss(205,70,F.col):slime(215,96,F.col);cx.globalAlpha=1}
+ cx.restore();requestAnimationFrame(loop)}
+start();loop();
+</script></body></html>
