@@ -33,6 +33,8 @@ button.sel{border-color:var(--gold);box-shadow:0 0 10px var(--gold);background:#
 button:disabled{opacity:.5;cursor:default}
 .hcard{display:flex;gap:10px;align-items:flex-start}
 .pt{width:68px;height:72px;flex:none;image-rendering:pixelated;border:1px solid var(--line);border-radius:6px}
+.ty{display:inline-block;color:var(--tc);border:1px solid var(--tc);background:color-mix(in srgb,var(--tc) 14%,transparent);border-radius:4px;padding:0 5px;font-size:.85em;font-weight:bold;white-space:nowrap;text-shadow:none}
+.side .ty{font-size:10px;padding:0 3px}
 .dossier{border-left:3px solid var(--pink);padding:4px 10px;margin:0 0 12px;color:var(--fg)}
 .dossier p{margin:.3em 0}
 .q{font-weight:bold;margin-bottom:8px}
@@ -51,10 +53,10 @@ button:disabled{opacity:.5;cursor:default}
 </main>
 <script>
 const TY={
- lens:{n:"Problem Lens",d:"Problems before solutions",c:"#4ef0ff"},
- whys:{n:"Five Whys",d:"Symptom → root cause",c:"#ffd25e"},
- outcome:{n:"Outcome",d:"Outcomes over outputs",c:"#ff5fae"},
- unite:{n:"Triad",d:"Policy + Ops + Tech together",c:"#5dffa0"}};
+ lens:{n:"Problem Lens",i:"◎",d:"Problems before solutions",c:"#4ef0ff"},
+ whys:{n:"Five Whys",i:"?",d:"Symptom → root cause",c:"#ffd25e"},
+ outcome:{n:"Outcome",i:"★",d:"Outcomes over outputs",c:"#ff5fae"},
+ unite:{n:"Triad",i:"▲",d:"Policy + Ops + Tech together",c:"#5dffa0"}};
 const HEROES=[
  {id:"lumen",n:"Lumen",ty:"lens",hair:"#4ef0ff",suit:"#2a5bd6",bio:"A scout who refuses to build anything until the problem has been named."},
  {id:"quill",n:"Quill",ty:"whys",hair:"#ffd25e",suit:"#7a4a12",bio:"A detective who asks \"why?\" until the symptoms give way to the cause."},
@@ -76,21 +78,22 @@ const QS={
 const FOES=[
  {n:"SOLUTIONITIS",hp:90,atk:16,weak:["lens"],col:"#ff5fae",shape:"slime",
   profile:["Arrives already holding a solution: \"Just build the chatbot!\"","Nobody in its camp can say what problem the chatbot solves."],
-  debrief:"Solutionitis jumps to a solution before naming a problem. <b>Problem Lens</b> (problems before solutions) breaks it."},
+  debrief:()=>`Solutionitis jumps to a solution before naming a problem. ${tag("lens")} (problems before solutions) breaks it.`},
  {n:"THE FEATURE FACTORY",hp:160,atk:19,weak:["whys","outcome"],boss:1,col:"#ff9a5f",shape:"boss",
   profile:["<b>Phase 1:</b> patches every complaint with a new feature, but the complaints keep regrowing because it only treats symptoms.","<b>Phase 2:</b> celebrates \"40 features shipped!\" and never checks whether anything changed for users."],
-  debrief:"Phase 1 treated symptoms: <b>Five Whys</b> digs to the root cause. Phase 2 counted outputs: <b>Outcome</b> (outcomes over outputs) breaks it."}];
+  debrief:()=>`Phase 1 treated symptoms: ${tag("whys")} digs to the root cause. Phase 2 counted outputs: ${tag("outcome")} (outcomes over outputs) breaks it.`}];
 let team,F,fi,used={},phase,turn,flash=0,shake=0,t=0,stars=[],fx=[],lunge={},lungeE=0,hurt={};
 for(let i=0;i<60;i++)stars.push([Math.random()*320,Math.random()*160,Math.random()]);
 const $=id=>document.getElementById(id),panel=$("panel"),wait=ms=>new Promise(r=>setTimeout(r,ms));
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const tag=k=>`<span class="ty" style="--tc:${TY[k].c}">${TY[k].i} ${TY[k].n}</span>`;
 const H=id=>HEROES.find(h=>h.id===id);
 function start(){fi=0;F=null;team=[];draft()}
 // ---- team draft ----
 function draft(){const foe=FOES[fi];F=null;team=[];hud();let sel=[];
  panel.innerHTML=`<h3>Battle ${fi+1} of ${FOES.length}: ${foe.n}</h3><div class="dossier">${foe.profile.map(p=>`<p>${p}</p>`).join("")}</div>
  <div id="log">Which weakness does this behaviour reveal? <b>Deploy 2 heroes.</b> Each hero's attacks hit hard only if their type matches the weakness.</div><div class="grid" id="hg"></div><div class="row"><button id="go" disabled>Deploy team ▶</button></div>`;
- HEROES.forEach(h=>{const b=document.createElement("button");b.className="hcard";b.innerHTML=`<span style="color:${h.hair}">◆ ${h.n}</span> <small>Type: ${TY[h.ty].n} — ${TY[h.ty].d}</small><small>${h.bio}</small>`;
+ HEROES.forEach(h=>{const b=document.createElement("button");b.className="hcard";b.innerHTML=`<b>${h.n}</b> ${tag(h.ty)}<small style="color:${TY[h.ty].c}">${TY[h.ty].d}</small><small>${h.bio}</small>`;
   b.onclick=()=>{if(sel.includes(h.id))sel=sel.filter(x=>x!==h.id);else if(sel.length<2)sel.push(h.id);
    [...$("hg").children].forEach((x,i)=>x.classList.toggle("sel",sel.includes(HEROES[i].id)));$("go").disabled=sel.length!==2;
    team=sel.map(id=>({...H(id),hp:70,max:70}));hud()};
@@ -100,16 +103,16 @@ function draft(){const foe=FOES[fi];F=null;team=[];hud();let sel=[];
 function battle(){F={...FOES[fi],max:FOES[fi].hp,known:false};phase=0;turn=0;hud();say(`<b>${F.n}</b> attacks! Your team: <b>${team.map(h=>h.n).join(" & ")}</b>.`);setTimeout(heroTurn,1100)}
 const alive=()=>team.filter(h=>h.hp>0);
 const curWeak=()=>F.boss?F.weak[phase]:F.weak[0];
-function hud(){$("team").innerHTML=(team.length?team:[]).map((h,i)=>`<div class="unit ${F&&i===turn%2&&h.hp>0?"act":""} ${h.hp<=0?"ko":""}"><b style="color:${h.hair}">${h.n}</b> <span style="opacity:.8">[${TY[h.ty].n}]</span><div class="hp"><i style="width:${h.hp/h.max*100}%"></i></div>${h.hp}/${h.max}</div>`).join("")||"<b>Choose your team…</b>";
+function hud(){$("team").innerHTML=(team.length?team:[]).map((h,i)=>`<div class="unit ${F&&i===turn%2&&h.hp>0?"act":""} ${h.hp<=0?"ko":""}"><b>${h.n}</b> ${tag(h.ty)}<div class="hp"><i style="width:${h.hp/h.max*100}%"></i></div>${h.hp}/${h.max}</div>`).join("")||"<b>Choose your team…</b>";
  if(!F){$("ename").textContent=FOES[fi].n;$("ehp").style.width="100%";$("etxt").textContent="";$("eweak").textContent="WEAK: ???";return}
  $("ehp").style.width=Math.max(0,F.hp)/F.max*100+"%";$("etxt").textContent=Math.max(0,F.hp)+"/"+F.max;$("ename").textContent=F.n;
- $("eweak").textContent="WEAK: "+(F.known?TY[curWeak()].n:"???")}
+ $("eweak").innerHTML="WEAK: "+(F.known?tag(curWeak()):"???")}
 function say(h){panel.innerHTML=`<div id="log">${h}</div>`}
 function pick(k){const pool=QS[k];used[k]=used[k]||[];if(used[k].length>=pool.length)used[k]=[];
  let i;do{i=Math.random()*pool.length|0}while(used[k].includes(i));used[k].push(i);return pool[i]}
 function heroTurn(){let i=turn%2;if(team[i].hp<=0){turn++;i=turn%2}const h=team[i];hud();
  const q=pick(h.ty),opts=shuffle([0,1,2].map(j=>({t:q[j+1],ok:j===q[4]})));
- say(`<b style="color:${h.hair}">${h.n}</b>'s turn [${TY[h.ty].n}]. Answer to land the attack!`);
+ say(`<b>${h.n}</b>'s turn ${tag(h.ty)}. Answer to land the attack!`);
  const qd=document.createElement("div");qd.className="q";qd.textContent=q[0];panel.appendChild(qd);
  const g=document.createElement("div");g.className="grid";g.style.gridTemplateColumns="1fr";
  opts.forEach(o=>{const b=document.createElement("button");b.textContent=o.t;b.onclick=()=>{
@@ -118,7 +121,7 @@ function heroTurn(){let i=turn%2;if(team[i].hp<=0){turn++;i=turn%2}const h=team[
 async function resolve(i,ok){const h=team[i],weak=h.ty===curWeak();let d=0,msg;
  if(!ok)msg=`✗ Wrong answer. ${h.n}'s attack fizzles!`;
  else if(weak){d=36+(Math.random()*8|0);msg=`✓ <b>WEAKNESS BREAK!</b> ${h.n} deals <b>${d}</b>!`}
- else{d=8+(Math.random()*5|0);msg=`✓ Correct, but ${F.n} resists ${TY[h.ty].n}. Only <b>${d}</b>.`}
+ else{d=8+(Math.random()*5|0);msg=`✓ Correct, but ${F.n} resists ${tag(h.ty)}. Only <b>${d}</b>.`}
  say(msg);await castFx(i,ok,weak,d);if(ok){F.hp-=d;if(weak)F.known=true}hud();await wait(700);
  if(F.hp<=0)return win();
  if(F.boss&&phase===0&&F.hp<=F.max/2){phase=1;F.known=false;hud();say(`<b>${F.n}</b> transforms! "Fine, I'll count features shipped instead!" Its weakness has changed.`);flash=20;await wait(1800)}
@@ -133,8 +136,8 @@ async function foeTurn(ok){const tg=alive()[Math.random()*alive().length|0],ti=t
  tg.hp=Math.max(0,tg.hp-d);shake=8;hurt[ti]=10;burst(HX[ti]+8,HY[ti]+12,"#ff5f6d",14);num(HX[ti]+8,HY[ti]-4,"-"+d,"#ff5f6d");hud();
  if(tg.hp<=0)say(`<b>${tg.n}</b> is knocked out!`);await wait(1000)}
 function win(){const f=FOES[fi];
- if(fi<FOES.length-1){panel.innerHTML=`<div class="big">★ ${f.n} defeated!<p style="color:var(--mute)">${f.debrief}</p><button id="nb">Scout the next enemy ▶</button></div>`;$("nb").onclick=()=>{fi++;draft()}}
- else{panel.innerHTML=`<div class="big"><b style="color:var(--gold);font-size:1.3rem">★ VICTORY ★</b><p style="color:var(--mute)">${f.debrief}</p><small style="color:var(--mute)">Remember: problems before solutions · find the root cause · outcomes over outputs · Policy–Ops–Tech together.</small><br><button id="rb">Play again</button></div>`;$("rb").onclick=start}}
+ if(fi<FOES.length-1){panel.innerHTML=`<div class="big">★ ${f.n} defeated!<p style="color:var(--mute)">${f.debrief()}</p><button id="nb">Scout the next enemy ▶</button></div>`;$("nb").onclick=()=>{fi++;draft()}}
+ else{panel.innerHTML=`<div class="big"><b style="color:var(--gold);font-size:1.3rem">★ VICTORY ★</b><p style="color:var(--mute)">${f.debrief()}</p><small style="color:var(--mute)">Remember: problems before solutions · find the root cause · outcomes over outputs · Policy–Ops–Tech together.</small><br><button id="rb">Play again</button></div>`;$("rb").onclick=start}}
 function lose(){panel.innerHTML=`<div class="big"><b style="color:var(--bad)">TEAM DEFEATED</b><p style="color:var(--mute)">${F.n} wins this round. Re-read its profile: which product-thinking habit is it missing? Pick heroes whose type supplies it.</p><button id="rb">Re-draft this battle</button></div>`;$("rb").onclick=draft}
 // ---- effects ----
 const HX=[40,82],HY=[90,104];
